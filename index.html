@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Interactive Floorplan Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+    crossorigin=""
+  />
+<style>
+  html, body, #map {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #184377;
+  }
+
+  #map {
+    z-index: 0;
+    
+  }
+#map-title {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 10px 20px;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 1001;
+}
+.restroom-icon, .badge-icon, .fire-extinguisher-icon, .first-aid-icon {
+  font-size: 20px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.leaflet-marker-icon:hover {
+  transform: scale(1.3);
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+  z-index: 1002;
+}
+
+#filter-toggle {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: #0078D7;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  font-size: 16px;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+#filter-toggle:hover {
+  background: #005a9e;
+}
+
+
+  #filter-panel {
+    position: absolute;
+    bottom: 70px;
+    left: 20px;
+    width: 220px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    padding: 16px;
+    z-index: 1001;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 14px;
+  }
+
+  #filter-panel h3 {
+    font-size: 15px;
+    margin-top: 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+  }
+
+#filter-panel label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+  font-size: 14px;
+  color: #333;
+}
+
+  #filter-panel input[type="checkbox"] {
+    margin-right: 6px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+  .leaflet-interactive:hover {
+  stroke: black !important;
+  stroke-width: 2 !important;
+  fill-opacity: 0.5 !important;
+  cursor: pointer;
+}
+
+.leaflet-marker-icon:hover {
+  transform: scale(1.2);
+  transition: transform 0.2s ease-in-out;
+  z-index: 999 !important;
+}
+</style>
+
+
+</head>
+<body>
+
+<div id="map-title">📍 Dove Valley Interactive Map</div>
+<div id="filter-toggle">🎛️ Filters</div>
+<div id="filter-panel" class="hidden">
+  <h3>🗂️ Spaces</h3>
+  <label><input type="checkbox" id="departments"> 🏢 Department Locations</label>
+  <label><input type="checkbox" id="conference"> 🧑‍💼 Conference Rooms</label>
+  <label><input type="checkbox" id="restrooms"> 🚻 Restrooms</label>
+  <label><input type="checkbox" id="kitchen"> ☕ Kitchen & Coffee Areas</label>
+  <label><input type="checkbox" id="wellness"> 🧘 Wellness, Chat, & Phone Rooms</label>
+
+  <h3>🔧 Utilities</h3>
+  <label><input type="checkbox" id="printers"> 🖨️ Printer and Supply Areas</label>
+  <label><input type="checkbox" id="badge"> 🪪 Entry Points & Badge Readers</label>
+  <label><input type="checkbox" id="fire"> 🔥 Fire Safety (Extinguishers, AED)</label>
+</div>
+
+
+  <div id="map"></div>
+
+<script 
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+  crossorigin="">
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const map = L.map('map', {
+    crs: L.CRS.Simple,
+    minZoom: -1,
+    zoomSnap: 0.1,
+    zoomDelta: 0.25
+  });
+
+  const imageWidth = 225.0, imageHeight = 125.2;
+  const imageUrl = 'updated-floorplan.jpg';
+  const imageBounds = [[0, 0], [imageHeight, imageWidth]];
+  L.imageOverlay(imageUrl, imageBounds).addTo(map);
+  map.fitBounds(imageBounds);
+
+  const layers = {
+    departments: L.layerGroup().addTo(map),
+    conference: L.layerGroup().addTo(map),
+    restrooms: L.layerGroup().addTo(map),
+    kitchen: L.layerGroup().addTo(map),
+    wellness: L.layerGroup().addTo(map),
+    badge: L.layerGroup().addTo(map),
+    printers: L.layerGroup().addTo(map),
+    fire: L.layerGroup().addTo(map),
+    hotels: L.layerGroup().addTo(map)
+  };
+
+  fetch('floorplan-data.json')
+    .then(response => response.json())
+    .then(data => {
+      if (data.conference_rooms) {
+        data.conference_rooms.forEach(room => {
+          const coords = room.polygon.map(c => [c[1], c[0]]);
+          const polygon = L.polygon(coords, { color: 'blue', fillColor: 'blue', fillOpacity: 0.4, weight: 1 })
+            .bindTooltip(`<b>${room.name}</b>`);
+          layers.conference.addLayer(polygon);
+        });
+      }
+
+      if (data.restrooms) {
+        data.restrooms.forEach(r => {
+          let iconHtml = '🚻';
+          if (r.name.includes('Women')) iconHtml = '🚺';
+          else if (r.name.includes('Men')) iconHtml = '🚹';
+          const icon = L.divIcon({ className: 'restroom-icon', html: iconHtml });
+          const marker = L.marker(r.coords, { icon }).bindTooltip(r.name, { direction: "top" });
+;
+          layers.restrooms.addLayer(marker);
+        });
+      }
+
+     const fixedDepartmentColors = {
+  "Executives": "#C62828",              // deep red
+  "Procurement": "#2E7D32",             // forest green
+  "Equipment / Fleet": "#F9A825",       // amber
+  "Admin / Facilities / Travel": "#1565C0", // cobalt blue
+  "HR / Recruiting": "#6D4C41",         // warm brown
+  "Internal Audit": "#4527A0",          // deep purple
+  "Business Excellence": "#00838F",     // cyan slate
+  "PSC IT": "#AD1457",                  // wine
+  "BESS": "#558B2F",                    // olive green
+  "Operations": "#5D4037",              // rich brown
+  "Engineering": "#0277BD",            // steel blue
+  "Estimating": "#6A1B9A",              // muted violet
+  "O&M": "#37474F",                     // slate grey
+  "Project Controls": "#FF6F00",        // dark orange
+  "Business Development": "#283593",    // navy
+  "EAs / Safety": "#455A64",            // blue-grey
+  "Hotels": "#9E9E9E",                  // medium grey
+  "Reception": "#1565C0"                // matches Admin
+};
+
+
+      if (data.departments) {
+  data.departments.forEach(dept => {
+    let name = dept.name;
+    if (name === "Reception") {
+      name = "Admin / Facilities / Travel"; // unifies Reception color
+    }
+
+    const color = fixedDepartmentColors[name] || "#AAAAAA"; // fallback gray
+    const coords = dept.polygon.map(c => [c[1], c[0]]);
+    const popup = `<b>${dept.name}</b>${dept.description ? '<br>' + dept.description : ''}`;
+    const polygon = L.polygon(coords, {
+      color,
+      fillColor: color,
+      fillOpacity: 0.3,
+      weight: 1
+    }).bindTooltip(popup);
+    layers.departments.addLayer(polygon);
+  });
+}
+
+
+      if (data.kitchen) {
+        data.kitchen.forEach(k => {
+          const coords = k.polygon.map(c => [c[1], c[0]]);
+          const polygon = L.polygon(coords, { color: 'orange', fillColor: 'orange', fillOpacity: 0.3, weight: 1 })
+            .bindTooltip(`<b>${k.name}</b>`);
+          layers.kitchen.addLayer(polygon);
+        });
+      }
+
+     if (data.wellness) {
+  data.wellness.forEach(room => {
+    const coords = room.polygon.map(c => [c[1], c[0]]);
+    const color = room.name === "Wellness" ? "#A020F0" : "purple"; // distinct purple for the room named exactly "Wellness"
+    const polygon = L.polygon(coords, {
+      color,
+      fillColor: color,
+      fillOpacity: 0.3,
+      weight: 1
+    }).bindTooltip(`<b>${room.name}</b>`);
+    layers.wellness.addLayer(polygon);
+  });
+}
+
+
+      if (data.printers) {
+        data.printers.forEach(p => {
+          const coords = p.polygon.map(c => [c[1], c[0]]);
+          const polygon = L.polygon(coords, { color: 'gray', fillColor: 'gray', fillOpacity: 0.3, weight: 1 })
+            .bindTooltip(`<b>${p.name}</b>`);
+          layers.printers.addLayer(polygon);
+        });
+      }
+
+      if (data.hotels) {
+        data.hotels.forEach(h => {
+          const coords = h.polygon.map(c => [c[1], c[0]]);
+          const popup = `<b>${h.name}</b>${h.description ? '<br>' + h.description : ''}`;
+          const polygon = L.polygon(coords, { color: 'teal', fillColor: 'teal', fillOpacity: 0.3, weight: 1 }).bindTooltip(popup);
+          layers.hotels.addLayer(polygon);
+        });
+      }
+
+      if (data.badge) {
+        data.badge.forEach(b => {
+          if (b.polygon) {
+            const coords = b.polygon.map(c => [c[1], c[0]]);
+            const polygon = L.polygon(coords, { color: 'green', fillColor: 'green', fillOpacity: 0.3, weight: 1 }).bindTooltip(`<b>${b.name}</b>`);
+            layers.badge.addLayer(polygon);
+          }
+          if (b.coordinates) {
+            const icon = L.divIcon({ className: 'badge-icon', html: '🪪' });
+            const marker = L.marker([b.coordinates[1], b.coordinates[0]], { icon }).bindTooltip(`<b>${b.name}</b>`);
+            layers.badge.addLayer(marker);
+          }
+        });
+      }
+
+      if (data.fire) {
+        data.fire.forEach(f => {
+          if (f.polygon) {
+            const coords = f.polygon.map(c => [c[1], c[0]]);
+            const polygon = L.polygon(coords, { color: 'red', fillColor: 'red', fillOpacity: 0.3, weight: 1 }).bindTooltip(`<b>${f.name}</b><br>${f.description || ''}`);
+            layers.fire.addLayer(polygon);
+          }
+          if (f.coordinates && f.name === "Fire Extinguisher") {
+            const icon = L.divIcon({ className: 'fire-extinguisher-icon', html: '🧯' });
+            const marker = L.marker([f.coordinates[1], f.coordinates[0]], { icon }).bindTooltip(`<b>${f.name}</b>`);
+            layers.fire.addLayer(marker);
+          }
+          if (f.coordinates && f.name === "First Aid & AED") {
+            const icon = L.divIcon({ className: 'first-aid-icon', html: '🩹' });
+            const marker = L.marker([f.coordinates[1], f.coordinates[0]], { icon }).bindTooltip(`<b>${f.name}</b><br>${f.description}`);
+            layers.fire.addLayer(marker);
+          }
+        });
+      }
+
+      Object.values(layers).forEach(layer => map.removeLayer(layer));
+    });
+
+  Object.keys(layers).forEach(id => {
+    const checkbox = document.getElementById(id);
+    if (checkbox) {
+      checkbox.addEventListener('change', e => {
+        e.target.checked ? map.addLayer(layers[id]) : map.removeLayer(layers[id]);
+      });
+    }
+  });
+
+  const toggle = document.getElementById('filter-toggle');
+  const panel = document.getElementById('filter-panel');
+
+  toggle.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+      map.setZoom(map.getZoom() - 0.4); // zoom out when opening
+    } else {
+      map.setZoom(map.getZoom() + 0.4); // zoom in when closing
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+      if (!panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        map.setZoom(map.getZoom() + 0.4); // zoom back in if clicked away
+      }
+    }
+  });
+});
+</script>
+
+</body>
+</html>
