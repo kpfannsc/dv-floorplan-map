@@ -35,7 +35,29 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   z-index: 1001;
 }
+
+.conference-label {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #050505;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.conference-label-text {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+
 .restroom-icon, .badge-icon, .fire-extinguisher-icon, .first-aid-icon {
+  font-size: 30px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+.badge-icon {
   font-size: 20px;
   transition: transform 0.2s ease, filter 0.2s ease;
 }
@@ -107,18 +129,26 @@
   .hidden {
     display: none !important;
   }
-  .leaflet-interactive:hover {
-  stroke: black !important;
-  stroke-width: 2 !important;
-  fill-opacity: 0.5 !important;
+.map-polygon:hover,
+.leaflet-interactive:focus {
+  stroke: #333 !important;
+  stroke-width: 1.5 !important;
+  fill-opacity: 0.4 !important;
+  outline: none !important;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.2));
   cursor: pointer;
 }
+
+
+
 
 .leaflet-marker-icon:hover {
   transform: scale(1.2);
   transition: transform 0.2s ease-in-out;
   z-index: 999 !important;
 }
+
+
 </style>
 
 
@@ -127,7 +157,7 @@
 
 <div id="map-title">📍 Dove Valley Interactive Map</div>
 <div id="filter-toggle">🎛️ Filters</div>
-<div id="filter-panel" class="hidden">
+<div id="filter-panel">
   <h3>🗂️ Spaces</h3>
   <label><input type="checkbox" id="departments"> 🏢 Department Locations</label>
   <label><input type="checkbox" id="conference"> 🧑‍💼 Conference Rooms</label>
@@ -164,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const imageBounds = [[0, 0], [imageHeight, imageWidth]];
   L.imageOverlay(imageUrl, imageBounds).addTo(map);
   map.fitBounds(imageBounds);
+  map.setZoom(map.getZoom() - 0.4); // adjust for initially open filter panel
 
   const layers = {
     departments: L.layerGroup().addTo(map),
@@ -183,8 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.conference_rooms) {
         data.conference_rooms.forEach(room => {
           const coords = room.polygon.map(c => [c[1], c[0]]);
-          const polygon = L.polygon(coords, { color: 'blue', fillColor: 'blue', fillOpacity: 0.4, weight: 1 })
-            .bindTooltip(`<b>${room.name}</b>`);
+          const polygon = L.polygon(coords, {
+  color: 'blue',
+  fillColor: 'blue',
+  fillOpacity: 0.4,
+  weight: 1
+}).bindTooltip(`<div class="conference-label-text">${room.name.replace(' ', '<br>')}</div>`, {
+  permanent: true,
+  direction: 'center',
+  className: 'conference-label'
+});
+
           layers.conference.addLayer(polygon);
         });
       }
@@ -201,26 +241,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-     const fixedDepartmentColors = {
-  "Executives": "#C62828",              // deep red
-  "Procurement": "#2E7D32",             // forest green
-  "Equipment / Fleet": "#F9A825",       // amber
-  "Admin / Facilities / Travel": "#1565C0", // cobalt blue
-  "HR / Recruiting": "#6D4C41",         // warm brown
-  "Internal Audit": "#4527A0",          // deep purple
-  "Business Excellence": "#00838F",     // cyan slate
-  "PSC IT": "#AD1457",                  // wine
-  "BESS": "#558B2F",                    // olive green
-  "Operations": "#5D4037",              // rich brown
-  "Engineering": "#0277BD",            // steel blue
-  "Estimating": "#6A1B9A",              // muted violet
-  "O&M": "#37474F",                     // slate grey
-  "Project Controls": "#FF6F00",        // dark orange
-  "Business Development": "#283593",    // navy
-  "EAs / Safety": "#455A64",            // blue-grey
-  "Hotels": "#9E9E9E",                  // medium grey
-  "Reception": "#1565C0"                // matches Admin
+ const fixedDepartmentColors = {
+  "Executives": "#b71c1c",              // deep crimson
+  "Procurement": "#1b5e20",             // dark forest green
+  "Equipment / Fleet": "#f57f17",       // muted gold
+  "Admin / Facilities / Travel": "#f7b6c2", // pink
+  "HR / Recruiting": "#c2b0ff",         // dark brown
+  "Internal Audit": "#311b92",          // royal purple
+  "Business Excellence": "#00695c",     // teal green
+  "PSC IT": "#880e4f",                  // wine red
+  "BESS": "#33691e",                    // olive green
+  "Operations": "#3e2723",              // chocolate brown
+  "Engineering": "#01579b",             // blue steel
+  "Estimating": "#4a148c",              // rich violet
+  "O&M": "#263238",                     // slate gray
+  "Project Controls": "#ef6c00",        // warm orange
+  "Business Development": "#1a237e",    // midnight blue
+  "EAs / Safety": "#37474f",            // bluish gray
+  "Hotels": "#00bfae",                  // noticeable plum purple
+  "Reception": "#f7b6c2"                // matches Admin
 };
+
 
 
       if (data.departments) {
@@ -289,10 +330,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.badge) {
         data.badge.forEach(b => {
           if (b.polygon) {
-            const coords = b.polygon.map(c => [c[1], c[0]]);
-            const polygon = L.polygon(coords, { color: 'green', fillColor: 'green', fillOpacity: 0.3, weight: 1 }).bindTooltip(`<b>${b.name}</b>`);
-            layers.badge.addLayer(polygon);
-          }
+  const coords = b.polygon.map(c => [c[1], c[0]]);
+  const isElevator = b.name === "Elevator";
+  const color = isElevator ? 'goldenrod' : 'green';
+  const polygon = L.polygon(coords, {
+    color: color,
+    fillColor: color,
+    fillOpacity: 0.3,
+    weight: 1
+  }).bindTooltip(`<b>${b.name}</b>`);
+  layers.badge.addLayer(polygon);
+}
           if (b.coordinates) {
             const icon = L.divIcon({ className: 'badge-icon', html: '🪪' });
             const marker = L.marker([b.coordinates[1], b.coordinates[0]], { icon }).bindTooltip(`<b>${b.name}</b>`);
