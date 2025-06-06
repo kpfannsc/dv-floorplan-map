@@ -295,38 +295,6 @@ document.addEventListener('DOMContentLoaded', () => {
 }
 
 
-      if (data.kitchen) {
-        data.kitchen.forEach(k => {
-          const coords = k.polygon.map(c => [c[1], c[0]]);
-          const polygon = L.polygon(coords, { color: 'orange', fillColor: 'orange', fillOpacity: 0.3, weight: 1 })
-            .bindTooltip(`<b>${k.name}</b>`);
-          layers.kitchen.addLayer(polygon);
-        });
-      }
-
-     if (data.wellness) {
-  data.wellness.forEach(room => {
-    const coords = room.polygon.map(c => [c[1], c[0]]);
-    const color = room.name === "Wellness" ? "#A020F0" : "purple"; // distinct purple for the room named exactly "Wellness"
-    const polygon = L.polygon(coords, {
-      color,
-      fillColor: color,
-      fillOpacity: 0.3,
-      weight: 1
-    }).bindTooltip(`<b>${room.name}</b>`);
-    layers.wellness.addLayer(polygon);
-  });
-}
-
-
-      if (data.printers) {
-        data.printers.forEach(p => {
-          const coords = p.polygon.map(c => [c[1], c[0]]);
-          const polygon = L.polygon(coords, { color: 'gray', fillColor: 'gray', fillOpacity: 0.3, weight: 1 })
-            .bindTooltip(`<b>${p.name}</b>`);
-          layers.printers.addLayer(polygon);
-        });
-      }
 
       if (data.hotels) {
         data.hotels.forEach(h => {
