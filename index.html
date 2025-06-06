@@ -40,7 +40,7 @@
   background: rgba(255, 255, 255, 0.8);
   border-radius: 6px;
   padding: 2px 4px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: bold;
   color: #050505;
   text-align: center;
@@ -260,6 +260,7 @@ if (data.printers) {
     "Center Printer, Supply": [60.3, 140.3]
   };
 
+ if (data.printers) {
   data.printers.forEach(p => {
     const coords = p.polygon.map(c => [c[1], c[0]]);
     const polygon = L.polygon(coords, {
@@ -268,6 +269,11 @@ if (data.printers) {
       fillOpacity: 0.3,
       weight: 1
     });
+    addTextOverlayToPolygon(polygon, p.name);
+    layers.printers.addLayer(polygon);
+  });
+}
+
 
     const label = Object.entries(printerNames).find(
       ([_, coord]) =>
